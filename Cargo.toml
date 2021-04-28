@@ -1,0 +1,23 @@
+[package]
+name = "lib-shim-v2"
+version = "0.1.0"
+authors = ["Huawei iSula Team"]
+edition = "2018"
+build = "build.rs"
+description = "as a shim V2 ttrpc client, it is called by iSulad and written in rust"
+license = "Mulan PSL v2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+protobuf = "2.8.0"
+
+[build-dependencies]
+protoc-rust = "2.8.0"
+cmd_lib = "0.7.8"
+ttrpc-codegen = "0.1.2"
+
+[lib]
+name = "shim_v2"
+crate-type = ["dylib"]
+
