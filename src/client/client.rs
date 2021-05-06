@@ -102,4 +102,18 @@ impl Store {
 
         Ok(resp.pid as i32)
     }
+
+    pub fn start(&self, container_id: &String, exec_id: &String) -> Result<i32> {
+        ValidateTool {}.str_empty(container_id)?;
+
+        let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
+
+        let mut req = protocols::shim::StartRequest::new();
+        req.id = container_id.clone();
+        req.exec_id = exec_id.clone();
+
+        let resp = client.start(&req, self.timeout).map_err(shim_error!(e, "ttrpc call start failed"))?;
+
+        Ok(resp.pid as i32)
+    }
 }
