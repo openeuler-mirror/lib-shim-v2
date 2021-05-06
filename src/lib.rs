@@ -49,3 +49,22 @@ pub extern "C" fn shim_v2_create(container_id: *const c_char, bundle: *const c_c
         -1
     })
 }
+
+#[no_mangle]
+pub extern "C" fn shim_v2_start(container_id: *const c_char, exec_id: *const c_char, pid: &mut c_int) -> c_int {
+    let (r_container_id, r_exec_id) = (
+        to_string(container_id),
+        to_string(exec_id)
+    );
+    println!("lib-shim-v2::start::{}:: [{}]", r_container_id, r_exec_id);
+    get_conn(&r_container_id).and_then(|client| {
+        client.start(&r_container_id, &r_exec_id).map(|process_pid| {
+            *pid = process_pid;
+            println!("lib-shim-v2::start::{}:: done.", r_container_id);
+            0
+        })
+    }).unwrap_or_else(|e| {
+        println!("lib-shim-v2::start::{}:: failed, {}.", r_container_id, e);
+        -1
+    })
+}
