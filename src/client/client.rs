@@ -1,9 +1,12 @@
+use crate::protocols;
+use super::error::{Error, Result};
 use std::sync::Mutex;
 use std::collections::HashMap;
 use std::os::unix::io::RawFd;
 use nix::sys::socket::*;
 use lazy_static::lazy_static;
 use ttrpc::client::Client;
+use std::path::Path;
 use std::path::MAIN_SEPARATOR;
 
 #[derive(Clone)]
@@ -21,7 +24,7 @@ fn unix_sock(r#abstract: bool, socket_path: &str) -> Result<SockAddr> {
         let sockaddr_h = socket_path.to_owned() + &"\x00".to_string();
         UnixAddr::new_abstract(sockaddr_h.as_bytes())
     } else {
-        UnixAddr::new(socket_path);
+        UnixAddr::new(socket_path)
     }
     .map_err(other_error!(e, "failed to create socket: "))?;
 
@@ -35,7 +38,7 @@ fn connect_to_socket(abs: bool, address: &str) -> Result<RawFd> {
         SockType::Stream,
         SockFlag::empty(),
         None,
-    ).map_err(other_error!(e, "failed to create socket fd: "));
+    ).map_err(other_error!(e, "failed to create socket fd: "))?;
 
     let sockaddr = unix_sock(abs, address)?;
     connect(fd, &sockaddr).map_err(other_error!(e, "failed to connect socket: "))?;
@@ -60,7 +63,7 @@ pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
     Ok(())
 }
 
-pub fn get_conn(container_id: &String) {
+pub fn get_conn(container_id: &String) -> Result<Store> {
     if TTRPC_CLIENTS.lock().unwrap().contains_key(container_id) {
         Ok(TTRPC_CLIENTS.lock().unwrap().get(container_id).unwrap().clone())
     } else {
@@ -70,4 +73,33 @@ pub fn get_conn(container_id: &String) {
 
 pub fn del_conn(container_id: &String) {
     TTRPC_CLIENTS.lock().unwrap().remove(container_id);
+}
+
+struct ValidateTool {}
+
+impl ValidateTool {
+    fn str_empty(self, x: &String) -> Result<Self> {
+        return if x != "" { Ok(self) } else { Err(other!("parameter must not be empty!")) };
+    }
+}
+
+impl Store {
+    pub fn create(&self, container_id: &String, bundle: &String, terminal: bool,
+                    stdin: &String, stdout: &String, stderr: &String) -> Result<i32> {
+        ValidateTool {}.str_empty(container_id)?.str_empty(bundle)?;
+
+        let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
+
+        let mut req = protocols::shim::CreateTaskRequest::new();
+        req.id = container_id.clone();
+        req.bundle = bundle.clone();
+        req.terminal = terminal;
+        req.stdin = stdin.clone();
+        req.stdout = stdout.clone();
+        req.stderr = stderr.clone();
+
+        let resp = client.create(&req, self.timeout).map_err(shim_error!(e, "ttrpc call create failed"))?;
+
+        Ok(resp.pid as i32)
+    }
 }
