@@ -1,3 +1,15 @@
+// Copyright (c) 2020 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// lib-shim-v2 is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 use std::fmt;
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -6,7 +18,7 @@ pub enum Error {
     WithoutInit(String),
     InvalidArgument(String),
     ShimError(String),
-    Other(String), 
+    Other(String),
     IOError(String),
 }
 
@@ -17,7 +29,7 @@ impl fmt::Display for Error {
             Self::Other(ref s) => write!(f, "other error: {}", s),
             Self::WithoutInit(ref s) => write!(f, "connection has not been established: {}", s),
             Self::IOError(ref s) => write!(f, "io error: {}", s),
-            Self::ShimError(ref s) => write!(f, "call shim-v2 failed: {}", s)
+            Self::ShimError(ref s) => write!(f, "call shim-v2 failed: {}", s),
         }
     }
 }

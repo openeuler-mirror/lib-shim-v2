@@ -1,14 +1,26 @@
-use crate::protocols;
+// Copyright (c) 2020 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// lib-shim-v2 is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 use super::error::{Error, Result};
-use std::sync::Mutex;
+use crate::protocols;
+use lazy_static::lazy_static;
+use nix::sys::socket::*;
+use protocols::task::Status as shim_v2_status;
 use std::collections::HashMap;
 use std::os::unix::io::RawFd;
-use nix::sys::socket::*;
-use lazy_static::lazy_static;
-use ttrpc::client::Client;
 use std::path::Path;
 use std::path::MAIN_SEPARATOR;
-use protocols::task::Status as shim_v2_status;
+use std::sync::Mutex;
+use ttrpc::client::Client;
 
 #[derive(Clone)]
 pub struct Store {
@@ -68,7 +80,8 @@ fn connect_to_socket(abs: bool, address: &str) -> Result<RawFd> {
         SockType::Stream,
         SockFlag::empty(),
         None,
-    ).map_err(other_error!(e, "failed to create socket fd: "))?;
+    )
+    .map_err(other_error!(e, "failed to create socket fd: "))?;
 
     let sockaddr = unix_sock(abs, address)?;
     connect(fd, &sockaddr).map_err(other_error!(e, "failed to connect socket: "))?;
@@ -85,17 +98,25 @@ pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
 
     let path = Path::new(&MAIN_SEPARATOR.to_string()).join(address);
     let fd = connect_to_socket(true, &path.to_string_lossy())?;
-    TTRPC_CLIENTS.lock().unwrap().insert(container_id.clone(), Store {
-        conn: Client::new(fd),
-        timeout: 0,
-    });
+    TTRPC_CLIENTS.lock().unwrap().insert(
+        container_id.clone(),
+        Store {
+            conn: Client::new(fd),
+            timeout: 0,
+        },
+    );
 
     Ok(())
 }
 
 pub fn get_conn(container_id: &String) -> Result<Store> {
     if TTRPC_CLIENTS.lock().unwrap().contains_key(container_id) {
-        Ok(TTRPC_CLIENTS.lock().unwrap().get(container_id).unwrap().clone())
+        Ok(TTRPC_CLIENTS
+            .lock()
+            .unwrap()
+            .get(container_id)
+            .unwrap()
+            .clone())
     } else {
         Err(other!("connection has not been established..."))
     }
@@ -109,13 +130,24 @@ struct ValidateTool {}
 
 impl ValidateTool {
     fn str_empty(self, x: &String) -> Result<Self> {
-        return if x != "" { Ok(self) } else { Err(other!("parameter must not be empty!")) };
+        return if x != "" {
+            Ok(self)
+        } else {
+            Err(other!("parameter must not be empty!"))
+        };
     }
 }
 
 impl Store {
-    pub fn create(&self, container_id: &String, bundle: &String, terminal: bool,
-                    stdin: &String, stdout: &String, stderr: &String) -> Result<i32> {
+    pub fn create(
+        &self,
+        container_id: &String,
+        bundle: &String,
+        terminal: bool,
+        stdin: &String,
+        stdout: &String,
+        stderr: &String,
+    ) -> Result<i32> {
         ValidateTool {}.str_empty(container_id)?.str_empty(bundle)?;
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
@@ -128,7 +160,9 @@ impl Store {
         req.set_stdout(stdout.clone());
         req.set_stderr(stderr.clone());
 
-        let resp = client.create(&req, self.timeout).map_err(shim_error!(e, "ttrpc call create failed"))?;
+        let resp = client
+            .create(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call create failed"))?;
 
         Ok(resp.pid as i32)
     }
@@ -142,13 +176,21 @@ impl Store {
         req.set_id(container_id.clone());
         req.set_exec_id(exec_id.clone());
 
-        let resp = client.start(&req, self.timeout).map_err(shim_error!(e, "ttrpc call start failed"))?;
+        let resp = client
+            .start(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call start failed"))?;
 
         Ok(resp.pid as i32)
     }
 
     #[allow(unused)]
-    pub fn kill(&self, container_id: &String, exec_id: &String, signal: u32, all: bool) -> Result<()> {
+    pub fn kill(
+        &self,
+        container_id: &String,
+        exec_id: &String,
+        signal: u32,
+        all: bool,
+    ) -> Result<()> {
         ValidateTool {}.str_empty(container_id)?;
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
@@ -159,7 +201,9 @@ impl Store {
         req.set_signal(signal);
         req.set_all(all);
 
-        client.kill(&req, self.timeout).map_err(shim_error!(e, "ttrpc call kill failed"))?;
+        client
+            .kill(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call kill failed"))?;
 
         Ok(())
     }
@@ -173,7 +217,9 @@ impl Store {
         req.set_id(container_id.clone());
         req.set_exec_id(exec_id.clone());
 
-        let resp = client.delete(&req, self.timeout).map_err(shim_error!(e, "ttrpc call delete failed"))?;
+        let resp = client
+            .delete(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call delete failed"))?;
 
         Ok(DeleteResponse {
             exit_status: resp.exit_status,
@@ -189,14 +235,26 @@ impl Store {
         let mut req = protocols::shim::ShutdownRequest::new();
         req.set_id(container_id.clone());
 
-        client.shutdown(&req, self.timeout).map_err(shim_error!(e, "ttrpc call shutdown failed"))?;
+        client
+            .shutdown(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call shutdown failed"))?;
 
         Ok(())
     }
 
-    pub fn exec(&self, container_id: &String, exec_id: &String, terminal: bool,
-        stdin: &String, stdout: &String, stderr: &String, spec: &[u8]) -> Result<()> {
-        ValidateTool {}.str_empty(container_id)?.str_empty(exec_id)?;
+    pub fn exec(
+        &self,
+        container_id: &String,
+        exec_id: &String,
+        terminal: bool,
+        stdin: &String,
+        stdout: &String,
+        stderr: &String,
+        spec: &[u8],
+    ) -> Result<()> {
+        ValidateTool {}
+            .str_empty(container_id)?
+            .str_empty(exec_id)?;
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
@@ -207,17 +265,28 @@ impl Store {
         req.set_stdin(stdin.clone());
         req.set_stdout(stdout.clone());
         req.set_stderr(stderr.clone());
-        let mut exec_spec: ::protobuf::well_known_types::Any = ::protobuf::well_known_types::Any::new();
+        let mut exec_spec: ::protobuf::well_known_types::Any =
+            ::protobuf::well_known_types::Any::new();
         exec_spec.set_value(std::vec::Vec::from(spec));
-        exec_spec.set_type_url(String::from("types.containerd.io/opencontainers/runtime-spec/1/Process"));
+        exec_spec.set_type_url(String::from(
+            "types.containerd.io/opencontainers/runtime-spec/1/Process",
+        ));
         req.set_spec(exec_spec);
 
-        client.exec(&req, self.timeout).map_err(shim_error!(e, "ttrpc call exec failed"))?;
+        client
+            .exec(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call exec failed"))?;
 
         Ok(())
     }
 
-    pub fn resize_pty(&self, container_id: &String, exec_id: &String, height: u32, width: u32) -> Result<()> {
+    pub fn resize_pty(
+        &self,
+        container_id: &String,
+        exec_id: &String,
+        height: u32,
+        width: u32,
+    ) -> Result<()> {
         ValidateTool {}.str_empty(container_id)?;
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
@@ -228,7 +297,9 @@ impl Store {
         req.set_height(height);
         req.set_width(width);
 
-        client.resize_pty(&req, self.timeout).map_err(shim_error!(e, "ttrpc call resize_pty failed"))?;
+        client
+            .resize_pty(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call resize_pty failed"))?;
 
         Ok(())
     }
@@ -241,7 +312,9 @@ impl Store {
         let mut req = protocols::shim::PauseRequest::new();
         req.set_id(container_id.clone());
 
-        client.pause(&req, self.timeout).map_err(shim_error!(e, "ttrpc call pause failed"))?;
+        client
+            .pause(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call pause failed"))?;
 
         Ok(())
     }
@@ -254,7 +327,9 @@ impl Store {
         let mut req = protocols::shim::ResumeRequest::new();
         req.set_id(container_id.clone());
 
-        client.resume(&req, self.timeout).map_err(shim_error!(e, "ttrpc call resume failed"))?;
+        client
+            .resume(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call resume failed"))?;
 
         Ok(())
     }
@@ -267,7 +342,9 @@ impl Store {
         let mut req = protocols::shim::StateRequest::new();
         req.set_id(container_id.clone());
 
-        let resp = client.state(&req, self.timeout).map_err(shim_error!(e, "ttrpc call state failed"))?;
+        let resp = client
+            .state(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call state failed"))?;
 
         Ok(State {
             id: container_id.clone(),
