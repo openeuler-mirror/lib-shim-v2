@@ -241,6 +241,7 @@ pub extern "C" fn shim_v2_exec(
         })
 }
 
+#[no_mangle]
 pub extern "C" fn shim_v2_resize_pty(
     container_id: *const c_char,
     exec_id: *const c_char,
