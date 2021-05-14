@@ -154,7 +154,7 @@ impl Store {
 
         let mut req = protocols::shim::CreateTaskRequest::new();
         req.set_id(container_id.clone());
-        req.set_bundle(container_id.clone());
+        req.set_bundle(bundle.clone());
         req.set_terminal(terminal);
         req.set_stdin(stdin.clone());
         req.set_stdout(stdout.clone());
