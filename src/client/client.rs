@@ -364,4 +364,18 @@ impl Store {
             exit_status: resp.exit_status,
         })
     }
+
+    pub fn pids(&self, container_id: &String) -> Result<i32> {
+        let c = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
+
+        let mut req = protocols::shim::PidsRequest::new();
+        req.id = container_id.clone();
+
+        let resp = c
+            .pids(&req, self.timeout)
+            .map_err(shim_error!(e, "call pids failed"))?;
+        let process = &resp.get_processes()[0];
+
+        Ok(process.pid as i32)
+    }
 }

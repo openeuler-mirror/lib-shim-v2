@@ -372,3 +372,21 @@ pub extern "C" fn shim_v2_state(container_id: *const c_char, state: &mut State) 
             -1
         })
 }
+
+#[no_mangle]
+pub extern "C" fn shim_v2_pids(container_id: *const c_char, pid: &mut c_int) -> c_int {
+    let r_container_id = to_string(container_id);
+    println!("in rutst::shim_v2_pids::{}:: start.", r_container_id);
+    get_conn(&r_container_id)
+        .and_then(|client| {
+            client.pids(&r_container_id).map(|process_pid| {
+                *pid = process_pid;
+                println!("in rust::shim_v2_pids::{}:: done", r_container_id);
+                0
+            })
+        })
+        .unwrap_or_else(|e| {
+            println!("in rust::shim_v2_pids::{}:: failed, {}", r_container_id, e);
+            -1
+        })
+}
