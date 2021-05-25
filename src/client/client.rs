@@ -89,12 +89,11 @@ fn connect_to_socket(abs: bool, address: &str) -> Result<RawFd> {
 }
 
 pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
-    let address;
-    if addr.starts_with("unix://") {
-        address = addr.strip_prefix("unix://").unwrap();
+    let address = if addr.starts_with("unix://") {
+        addr.strip_prefix("unix://").unwrap()
     } else {
-        address = addr;
-    }
+        addr
+    };
 
     let path = Path::new(&MAIN_SEPARATOR.to_string()).join(address);
     let fd = connect_to_socket(true, &path.to_string_lossy())?;
