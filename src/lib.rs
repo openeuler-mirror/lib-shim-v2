@@ -390,3 +390,27 @@ pub extern "C" fn shim_v2_pids(container_id: *const c_char, pid: &mut c_int) -> 
             -1
         })
 }
+
+#[no_mangle]
+pub extern "C" fn shim_v2_wait(
+    container_id: *const c_char,
+    exec_id: *const c_char,
+    exit_status: &mut c_int,
+) -> c_int {
+    let (r_container_id, r_exec_id) = (to_string(container_id), to_string(exec_id));
+    println!("lib-shim-v2::wait::{}:: [{}]", r_container_id, r_exec_id);
+    get_conn(&r_container_id)
+        .and_then(|client| {
+            client
+                .wait(&r_container_id, &r_exec_id)
+                .map(|exit_code| {
+                    *exit_status = exit_code;
+                    println!("lib-shim-v2::wait::{}:: done.", r_container_id);
+                    0
+                })
+        })
+        .unwrap_or_else(|e| {
+            println!("lib-shim-v2::wait::{}:: failed, {}.", r_container_id, e);
+            -1
+        })
+}

@@ -377,4 +377,20 @@ impl Store {
 
         Ok(process.pid as i32)
     }
+
+    pub fn wait(&self, container_id: &String, exec_id: &String) -> Result<i32> {
+        ValidateTool {}.str_empty(container_id)?;
+
+        let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
+
+        let mut req = protocols::shim::WaitRequest::new();
+        req.set_id(container_id.clone());
+        req.set_exec_id(exec_id.clone());
+
+        let resp = client
+            .wait(&req, self.timeout)
+            .map_err(shim_error!(e, "ttrpc call wait failed"))?;
+
+        Ok(resp.exit_status as i32)
+    }
 }
