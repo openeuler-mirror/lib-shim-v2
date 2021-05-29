@@ -59,6 +59,8 @@ int shim_v2_pause(const char *container_id);
 int shim_v2_resume(const char *container_id);
 
 int shim_v2_state(const char *container_id, const struct State *state);
-
 int shim_v2_pids(const char *container_id, int *pid);
+
+int shim_v2_wait(const char *container_id, const char *exec_id, int *exit_status);
+
 #endif /* LIB_SHIM_V2_H */
