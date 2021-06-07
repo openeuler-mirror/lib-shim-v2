@@ -401,16 +401,179 @@ pub extern "C" fn shim_v2_wait(
     println!("lib-shim-v2::wait::{}:: [{}]", r_container_id, r_exec_id);
     get_conn(&r_container_id)
         .and_then(|client| {
-            client
-                .wait(&r_container_id, &r_exec_id)
-                .map(|exit_code| {
-                    *exit_status = exit_code;
-                    println!("lib-shim-v2::wait::{}:: done.", r_container_id);
-                    0
-                })
+            client.wait(&r_container_id, &r_exec_id).map(|exit_code| {
+                *exit_status = exit_code;
+                println!("lib-shim-v2::wait::{}:: done.", r_container_id);
+                0
+            })
         })
         .unwrap_or_else(|e| {
             println!("lib-shim-v2::wait::{}:: failed, {}.", r_container_id, e);
             -1
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+    use std::os::raw::c_int;
+
+    #[test]
+    fn test_to_string() {
+        let raw_str = CString::new("hello").expect("CString::new failed");
+        let raw_ptr = raw_str.as_ptr();
+
+        assert_eq!(to_string(raw_ptr), String::from("hello"));
+    }
+
+    #[test]
+    fn test_shim_v2_create() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let bundle = CString::new("666666")
+            .expect("CString::new failed")
+            .as_ptr();
+        let stdin = CString::new("stdin")
+            .expect("CString::new stdin failed")
+            .as_ptr();
+        let stdout = CString::new("stdout")
+            .expect("CString::new stdout failed")
+            .as_ptr();
+        let stderr = CString::new("stderr")
+            .expect("CString::new stderr failed")
+            .as_ptr();
+        let mut pid: c_int = 0;
+
+        assert_eq!(
+            shim_v2_create(cid, bundle, true, stdin, stdout, stderr, &mut pid),
+            -1
+        );
+    }
+
+    #[test]
+    fn test_shim_v2_start() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let exec_id = CString::new("666666")
+            .expect("CString::new failed")
+            .as_ptr();
+        let mut pid: c_int = 0;
+
+        assert_eq!(shim_v2_start(cid, exec_id, &mut pid), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_kill() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let exec_id = CString::new("666666")
+            .expect("CString::new failed")
+            .as_ptr();
+
+        assert_eq!(shim_v2_kill(cid, exec_id, 10, true), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_delete() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let exec_id = CString::new("666666")
+            .expect("CString::new failed")
+            .as_ptr();
+        let mut resp = DeleteResponse {
+            exit_status: 10,
+            pid: 123,
+        };
+
+        assert_eq!(shim_v2_delete(cid, exec_id, &mut resp), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_shutdown() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+
+        assert_eq!(shim_v2_shutdown(cid), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_exec() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let exec_id = CString::new("666666")
+            .expect("CString::new failed")
+            .as_ptr();
+        let stdin = CString::new("stdin")
+            .expect("CString::new stdin failed")
+            .as_ptr();
+        let stdout = CString::new("stdout")
+            .expect("CString::new stdout failed")
+            .as_ptr();
+        let stderr = CString::new("stderr")
+            .expect("CString::new stderr failed")
+            .as_ptr();
+        let spec = CString::new("spec")
+            .expect("CString::new spec failed")
+            .as_ptr();
+
+        assert_eq!(
+            shim_v2_exec(cid, exec_id, true, stdin, stdout, stderr, spec),
+            -1
+        );
+    }
+
+    #[test]
+    fn test_shim_v2_resize_pty() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let exec_id = CString::new("666666")
+            .expect("CString::new failed")
+            .as_ptr();
+
+        assert_eq!(shim_v2_resize_pty(cid, exec_id, 10, 10), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_pause() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+
+        assert_eq!(shim_v2_pause(cid), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_resume() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+
+        assert_eq!(shim_v2_resume(cid), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_state() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let mut st = State {
+            id: CString::new("12345").expect("CString::new failed").as_ptr(),
+            pid: 123,
+            status: UnknownStatus,
+            stdin: CString::new("12345").expect("CString::new failed").as_ptr(),
+            stdout: CString::new("12345").expect("CString::new failed").as_ptr(),
+            stderr: CString::new("12345").expect("CString::new failed").as_ptr(),
+            terminal: true,
+            exit_status: 1,
+        };
+
+        assert_eq!(shim_v2_state(cid, &mut st), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_pids() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let mut pid: c_int = 0;
+
+        assert_eq!(shim_v2_pids(cid, &mut pid), -1);
+    }
+
+    #[test]
+    fn test_shim_v2_wait() {
+        let cid = CString::new("12345").expect("CString::new failed").as_ptr();
+        let exec_id = CString::new("666666")
+            .expect("CString::new failed")
+            .as_ptr();
+        let mut status: c_int = 0;
+
+        assert_eq!(shim_v2_wait(cid, exec_id, &mut status), -1);
+    }
 }
