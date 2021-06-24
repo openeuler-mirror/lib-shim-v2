@@ -7,7 +7,7 @@
 
 Name:           lib-shim-v2
 Version:        0.0.1
-Release:        1
+Release:        2
 URL:            https://gitee.com/openeuler/lib-shim-v2
 Source:         %{name}-%{version}.tar.gz
 Summary:        lib-shim-v2 is shim v2 ttrpc client which is called by iSulad.
@@ -58,5 +58,11 @@ install -m 0550 target/release/libshim_v2.so ${RPM_BUILD_ROOT}/%{_libdir}/libshi
 %{_includedir}/shim_v2.h
 
 %changelog
+* Thu Jun 24 2021 gaohuatao <gaohuatao@huawei.com> - 0.0.1-2
+- Type:NA
+- ID:NA
+- SUG:NA
+- DESC:add Cargo.lock
+
 * Mon Jun 21 2021 gaohuatao <gaohuatao@huawei.com> - 0.0.1
 - Initial RPM release
