@@ -80,7 +80,6 @@ pub extern "C" fn shim_v2_create(
         .and_then(|client| {
             client
                 .create(
-                    &r_container_id,
                     &r_bundle,
                     terminal,
                     &r_stdin,
@@ -110,7 +109,7 @@ pub extern "C" fn shim_v2_start(
     get_conn(&r_container_id)
         .and_then(|client| {
             client
-                .start(&r_container_id, &r_exec_id)
+                .start(&r_exec_id)
                 .map(|process_pid| {
                     *pid = process_pid;
                     println!("lib-shim-v2::start::{}:: done.", r_container_id);
@@ -135,7 +134,7 @@ pub extern "C" fn shim_v2_kill(
     get_conn(&r_container_id)
         .and_then(|client| {
             client
-                .kill(&r_container_id, &r_exec_id, signal, all)
+                .kill(signal, all)
                 .map(|_| {
                     println!("lib-shim-v2::kill::{}:: done.", r_container_id);
                     0
@@ -163,7 +162,7 @@ pub extern "C" fn shim_v2_delete(
     println!("lib-shim-v2::delete::{}:: [{}]", r_container_id, r_exec_id);
     get_conn(&r_container_id)
         .and_then(|client| {
-            client.delete(&r_container_id, &r_exec_id).map(|response| {
+            client.delete(&r_exec_id).map(|response| {
                 resp.exit_status = response.exit_status;
                 resp.pid = response.pid;
                 println!("lib-shim-v2::delete::{}:: done.", r_container_id);
@@ -182,7 +181,7 @@ pub extern "C" fn shim_v2_shutdown(container_id: *const c_char) -> c_int {
     println!("lib-shim-v2::shutdown::{}::", r_container_id);
     get_conn(&r_container_id)
         .and_then(|client| {
-            client.shutdown(&r_container_id).map(|_| {
+            client.shutdown().map(|_| {
                 println!("lib-shim-v2::shutdown::{}:: done.", r_container_id);
                 0
             })
@@ -222,7 +221,6 @@ pub extern "C" fn shim_v2_exec(
         .and_then(|client| {
             client
                 .exec(
-                    &r_container_id,
                     &r_exec_id,
                     terminal,
                     &r_stdin,
@@ -256,7 +254,7 @@ pub extern "C" fn shim_v2_resize_pty(
     get_conn(&r_container_id)
         .and_then(|client| {
             client
-                .resize_pty(&r_container_id, &r_exec_id, height, width)
+                .resize_pty(&r_exec_id, height, width)
                 .map(|_| {
                     println!("lib-shim-v2::resize_pty::{}:: done.", r_container_id);
                     0
@@ -277,7 +275,7 @@ pub extern "C" fn shim_v2_pause(container_id: *const c_char) -> c_int {
     println!("lib-shim-v2::pause::{}::", r_container_id);
     get_conn(&r_container_id)
         .and_then(|client| {
-            client.pause(&r_container_id).map(|_| {
+            client.pause().map(|_| {
                 println!("lib-shim-v2::pause::{}:: done.", r_container_id);
                 0
             })
@@ -294,7 +292,7 @@ pub extern "C" fn shim_v2_resume(container_id: *const c_char) -> c_int {
     println!("lib-shim-v2::resume::{}::", r_container_id);
     get_conn(&r_container_id)
         .and_then(|client| {
-            client.resume(&r_container_id).map(|_| {
+            client.resume().map(|_| {
                 println!("lib-shim-v2::resume::{}:: done.", r_container_id);
                 0
             })
@@ -361,7 +359,7 @@ pub extern "C" fn shim_v2_state(container_id: *const c_char, state: &mut State) 
     println!("lib-shim-v2::state::{}::", r_container_id);
     get_conn(&r_container_id)
         .and_then(|client| {
-            client.state(&r_container_id).map(|container_state| {
+            client.state().map(|container_state| {
                 state.copy(container_state);
                 println!("lib-shim-v2::state::{}:: done.", r_container_id);
                 0
@@ -379,7 +377,7 @@ pub extern "C" fn shim_v2_pids(container_id: *const c_char, pid: &mut c_int) -> 
     println!("in rutst::shim_v2_pids::{}:: start.", r_container_id);
     get_conn(&r_container_id)
         .and_then(|client| {
-            client.pids(&r_container_id).map(|process_pid| {
+            client.pids().map(|process_pid| {
                 *pid = process_pid;
                 println!("in rust::shim_v2_pids::{}:: done", r_container_id);
                 0
@@ -401,7 +399,7 @@ pub extern "C" fn shim_v2_wait(
     println!("lib-shim-v2::wait::{}:: [{}]", r_container_id, r_exec_id);
     get_conn(&r_container_id)
         .and_then(|client| {
-            client.wait(&r_container_id, &r_exec_id).map(|exit_code| {
+            client.wait(&r_exec_id).map(|exit_code| {
                 *exit_status = exit_code;
                 println!("lib-shim-v2::wait::{}:: done.", r_container_id);
                 0
