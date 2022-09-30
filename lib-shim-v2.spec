@@ -50,6 +50,7 @@ sed -i 's/rustflags = \[/rustflags = \["-Clink-arg=-lgcc", "-Clink-arg=-lfdt", /
 %install
 mkdir -p ${RPM_BUILD_ROOT}/{%{_libdir},%{_includedir}}
 install -m 0640 shim_v2.h ${RPM_BUILD_ROOT}/%{_includedir}/shim_v2.h
+strip target/release/libshim_v2.so
 install -m 0550 target/release/libshim_v2.so ${RPM_BUILD_ROOT}/%{_libdir}/libshim_v2.so
 
 %files
