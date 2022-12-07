@@ -96,7 +96,7 @@ pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
     };
 
     let path = Path::new(&MAIN_SEPARATOR.to_string()).join(address);
-    let fd = connect_to_socket(true, &path.to_string_lossy())?;
+    let fd = connect_to_socket(!addr.starts_with("unix://"), &path.to_string_lossy())?;
     TTRPC_CLIENTS.lock().unwrap().insert(
         container_id.clone(),
         Store {
