@@ -25,6 +25,7 @@ use ttrpc::client::Client;
 #[derive(Clone)]
 pub struct Store {
     conn: Client,
+    container_id: String,
     timeout: i64,
 }
 
@@ -101,6 +102,7 @@ pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
         container_id.clone(),
         Store {
             conn: Client::new(fd),
+            container_id: container_id.clone(),
             timeout: 0,
         },
     );
@@ -140,19 +142,18 @@ impl ValidateTool {
 impl Store {
     pub fn create(
         &self,
-        container_id: &String,
         bundle: &String,
         terminal: bool,
         stdin: &String,
         stdout: &String,
         stderr: &String,
     ) -> Result<i32> {
-        ValidateTool {}.str_empty(container_id)?.str_empty(bundle)?;
+        ValidateTool {}.str_empty(bundle)?;
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::CreateTaskRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
         req.set_bundle(bundle.clone());
         req.set_terminal(terminal);
         req.set_stdin(stdin.clone());
@@ -166,13 +167,12 @@ impl Store {
         Ok(resp.pid as i32)
     }
 
-    pub fn start(&self, container_id: &String, exec_id: &String) -> Result<i32> {
-        ValidateTool {}.str_empty(container_id)?;
+    pub fn start(&self, exec_id: &String) -> Result<i32> {
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::StartRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
         req.set_exec_id(exec_id.clone());
 
         let resp = client
@@ -185,18 +185,14 @@ impl Store {
     #[allow(unused)]
     pub fn kill(
         &self,
-        container_id: &String,
-        exec_id: &String,
         signal: u32,
         all: bool,
     ) -> Result<()> {
-        ValidateTool {}.str_empty(container_id)?;
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::KillRequest::new();
-        req.set_id(container_id.clone());
-        // unused variable: exec_id
+        req.set_id(self.container_id.clone());
         req.set_signal(signal);
         req.set_all(all);
 
@@ -207,13 +203,12 @@ impl Store {
         Ok(())
     }
 
-    pub fn delete(&self, container_id: &String, exec_id: &String) -> Result<DeleteResponse> {
-        ValidateTool {}.str_empty(container_id)?;
+    pub fn delete(&self, exec_id: &String) -> Result<DeleteResponse> {
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::DeleteRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
         req.set_exec_id(exec_id.clone());
 
         let resp = client
@@ -226,13 +221,12 @@ impl Store {
         })
     }
 
-    pub fn shutdown(&self, container_id: &String) -> Result<()> {
-        ValidateTool {}.str_empty(container_id)?;
+    pub fn shutdown(&self) -> Result<()> {
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::ShutdownRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
 
         client
             .shutdown(&req, self.timeout)
@@ -243,7 +237,6 @@ impl Store {
 
     pub fn exec(
         &self,
-        container_id: &String,
         exec_id: &String,
         terminal: bool,
         stdin: &String,
@@ -252,13 +245,12 @@ impl Store {
         spec: &[u8],
     ) -> Result<()> {
         ValidateTool {}
-            .str_empty(container_id)?
             .str_empty(exec_id)?;
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::ExecProcessRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
         req.set_exec_id(exec_id.clone());
         req.set_terminal(terminal);
         req.set_stdin(stdin.clone());
@@ -281,17 +273,15 @@ impl Store {
 
     pub fn resize_pty(
         &self,
-        container_id: &String,
         exec_id: &String,
         height: u32,
         width: u32,
     ) -> Result<()> {
-        ValidateTool {}.str_empty(container_id)?;
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::ResizePtyRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
         req.set_exec_id(exec_id.clone());
         req.set_height(height);
         req.set_width(width);
@@ -303,13 +293,12 @@ impl Store {
         Ok(())
     }
 
-    pub fn pause(&self, container_id: &String) -> Result<()> {
-        ValidateTool {}.str_empty(container_id)?;
+    pub fn pause(&self) -> Result<()> {
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::PauseRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
 
         client
             .pause(&req, self.timeout)
@@ -318,13 +307,12 @@ impl Store {
         Ok(())
     }
 
-    pub fn resume(&self, container_id: &String) -> Result<()> {
-        ValidateTool {}.str_empty(container_id)?;
+    pub fn resume(&self) -> Result<()> {
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::ResumeRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
 
         client
             .resume(&req, self.timeout)
@@ -333,20 +321,19 @@ impl Store {
         Ok(())
     }
 
-    pub fn state(&self, container_id: &String) -> Result<State> {
-        ValidateTool {}.str_empty(container_id)?;
+    pub fn state(&self) -> Result<State> {
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::StateRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
 
         let resp = client
             .state(&req, self.timeout)
             .map_err(shim_error!(e, "ttrpc call state failed"))?;
 
         Ok(State {
-            id: container_id.clone(),
+            id: self.container_id.clone(),
             pid: resp.pid,
             status: match resp.status {
                 shim_v2_status::CREATED => Status::CreatedStatus,
@@ -364,11 +351,11 @@ impl Store {
         })
     }
 
-    pub fn pids(&self, container_id: &String) -> Result<i32> {
+    pub fn pids(&self) -> Result<i32> {
         let c = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::PidsRequest::new();
-        req.id = container_id.clone();
+        req.id = self.container_id.clone();
 
         let resp = c
             .pids(&req, self.timeout)
@@ -378,13 +365,12 @@ impl Store {
         Ok(process.pid as i32)
     }
 
-    pub fn wait(&self, container_id: &String, exec_id: &String) -> Result<i32> {
-        ValidateTool {}.str_empty(container_id)?;
+    pub fn wait(&self, exec_id: &String) -> Result<i32> {
 
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::WaitRequest::new();
-        req.set_id(container_id.clone());
+        req.set_id(self.container_id.clone());
         req.set_exec_id(exec_id.clone());
 
         let resp = client
