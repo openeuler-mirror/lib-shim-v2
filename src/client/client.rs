@@ -75,7 +75,35 @@ fn unix_sock(r#abstract: bool, socket_path: &str) -> Result<SockAddr> {
     Ok(sockaddr)
 }
 
-fn connect_to_socket(abs: bool, address: &str) -> Result<RawFd> {
+fn virtio_vsock(address: &str) -> Result<SockAddr> {
+    let (cid, port) = {
+        let vec: Vec<String> = address.split(":").map(String::from).collect();
+        if vec.len() < 2 {
+            let err_msg = format!("vsock address {address} is invalid");
+            return Err(other!(err_msg));
+        }
+        let cid = vec[0].parse::<u32>().map_err(other_error!(e, "failed to parse cid: "))?;
+        let port = vec[1].parse::<u32>().map_err(other_error!(e, "failed to parse port: "))?;
+        (cid, port)
+    };
+    let sockaddr = SockAddr::Vsock(VsockAddr::new(cid, port));
+    Ok(sockaddr)
+}
+
+fn connect_to_vsock(address: &str) -> Result<RawFd> {
+    let fd = socket(
+        AddressFamily::Vsock,
+        SockType::Stream,
+        SockFlag::empty(),
+        None,
+    )
+    .map_err(other_error!(e, "failed to create socket fd: "))?;
+    let sockaddr = virtio_vsock(address)?;
+    connect(fd, &sockaddr).map_err(other_error!(e, "failed to connect vsock: "))?;
+    Ok(fd)
+}
+
+fn connect_to_unix_socket(abs: bool, address: &str) -> Result<RawFd> {
     let fd = socket(
         AddressFamily::Unix,
         SockType::Stream,
@@ -90,14 +118,21 @@ fn connect_to_socket(abs: bool, address: &str) -> Result<RawFd> {
 }
 
 pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
-    let address = if addr.starts_with("unix://") {
-        addr.strip_prefix("unix://").unwrap()
+    let fd;
+    if addr.starts_with("vsock://") {
+        let address = addr.strip_prefix("vsock://").unwrap();
+        fd = connect_to_vsock(address)?;
     } else {
-        addr
+        let address;
+        if addr.starts_with("unix://") {
+            address = addr.strip_prefix("unix://").unwrap();
+        } else {
+            address = addr;
+        }
+        let path = Path::new(&MAIN_SEPARATOR.to_string()).join(address);
+        fd = connect_to_unix_socket(!addr.starts_with("unix://"), &path.to_string_lossy())?;
     };
 
-    let path = Path::new(&MAIN_SEPARATOR.to_string()).join(address);
-    let fd = connect_to_socket(!addr.starts_with("unix://"), &path.to_string_lossy())?;
     TTRPC_CLIENTS.lock().unwrap().insert(
         container_id.clone(),
         Store {
