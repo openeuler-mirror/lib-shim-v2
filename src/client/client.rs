@@ -78,7 +78,7 @@ fn unix_sock(r#abstract: bool, socket_path: &str) -> Result<SockAddr> {
 fn virtio_vsock(address: &str) -> Result<SockAddr> {
     let (cid, port) = {
         let vec: Vec<String> = address.split(":").map(String::from).collect();
-        if vec.len() < 2 {
+        if vec.len() != 2 {
             let err_msg = format!("vsock address {address} is invalid");
             return Err(other!(err_msg));
         }
@@ -118,19 +118,17 @@ fn connect_to_unix_socket(abs: bool, address: &str) -> Result<RawFd> {
 }
 
 pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
-    let fd;
-    if addr.starts_with("vsock://") {
+    let fd = if addr.starts_with("vsock://") {
         let address = addr.strip_prefix("vsock://").unwrap();
-        fd = connect_to_vsock(address)?;
+        connect_to_vsock(address)?
     } else {
-        let address;
-        if addr.starts_with("unix://") {
-            address = addr.strip_prefix("unix://").unwrap();
+        let address = if addr.starts_with("unix://") {
+            addr.strip_prefix("unix://").unwrap()
         } else {
-            address = addr;
-        }
+            addr
+        };
         let path = Path::new(&MAIN_SEPARATOR.to_string()).join(address);
-        fd = connect_to_unix_socket(!addr.starts_with("unix://"), &path.to_string_lossy())?;
+        connect_to_unix_socket(!addr.starts_with("unix://"), &path.to_string_lossy())?
     };
 
     TTRPC_CLIENTS.lock().unwrap().insert(
