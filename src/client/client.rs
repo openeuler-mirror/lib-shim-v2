@@ -118,8 +118,8 @@ fn connect_to_unix_socket(abs: bool, address: &str) -> Result<RawFd> {
 }
 
 pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
-    let fd = if addr.starts_with("vsock://") {
-        let address = addr.strip_prefix("vsock://").unwrap();
+    let fd = if addr.starts_with("ttrpc+vsock://") {
+        let address = addr.strip_prefix("ttrpc+vsock://").unwrap();
         connect_to_vsock(address)?
     } else {
         let address = if addr.starts_with("unix://") {
