@@ -121,6 +121,10 @@ pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
     let fd = if addr.starts_with("ttrpc+vsock://") {
         let address = addr.strip_prefix("ttrpc+vsock://").unwrap();
         connect_to_vsock(address)?
+    } else if addr.starts_with("ttrpc+unix://") {
+        let address = addr.strip_prefix("ttrpc+unix://").unwrap();
+        let path = Path::new(&MAIN_SEPARATOR.to_string()).join(address);
+        connect_to_unix_socket(!addr.starts_with("ttrpc+unix://"), &path.to_string_lossy())?
     } else {
         let address = if addr.starts_with("unix://") {
             addr.strip_prefix("unix://").unwrap()
