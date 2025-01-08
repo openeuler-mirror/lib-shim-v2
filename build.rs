@@ -1,6 +1,9 @@
 use ttrpc_codegen::Codegen;
+use ttrpc_codegen::ProtobufCustomize;
 
 fn main() {
+    let protobuf_customized = ProtobufCustomize::default().gen_mod_rs(false);
+
     Codegen::new()
         .out_dir("src/protocols")
         .inputs(&[
@@ -14,6 +17,7 @@ fn main() {
         ])
         .include("src/protocols/protos")
         .rust_protobuf()
+        .rust_protobuf_customize(protobuf_customized.clone())
         .run()
         .expect("Codegen failed");
 }
