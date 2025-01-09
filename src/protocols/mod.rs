@@ -13,6 +13,7 @@
 pub mod any;
 pub mod empty;
 pub mod gogo;
+pub mod metrics;
 pub mod mount;
 pub mod shim;
 pub mod shim_ttrpc;

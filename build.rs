@@ -14,6 +14,7 @@ fn main() {
             "src/protocols/protos/google/protobuf/timestamp.proto",
             "src/protocols/protos/github.com/containerd/containerd/api/types/mount.proto",
             "src/protocols/protos/github.com/containerd/containerd/api/types/task/task.proto",
+            "src/protocols/protos/github.com/containerd/cgroup/stats/v1/metrics.proto",
         ])
         .include("src/protocols/protos")
         .rust_protobuf()

@@ -22,7 +22,8 @@ use client::client::State as client_state;
 use client::client::Status as client_status;
 use client::client::{del_conn, get_conn, new_conn};
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_uint};
+use std::os::raw::{c_char, c_int, c_uint, c_ulonglong};
+use protocols::metrics::Metrics;
 
 fn to_string(x: *const c_char) -> String {
     unsafe {
@@ -367,6 +368,76 @@ pub extern "C" fn shim_v2_state(container_id: *const c_char, state: &mut State) 
         })
         .unwrap_or_else(|e| {
             println!("lib-shim-v2::state::{}:: failed, {}.", r_container_id, e);
+            -1
+        })
+}
+
+#[repr(C)]
+pub struct Stats {
+    pids_current: c_ulonglong,
+    /* CPU usage */
+    cpu_use_nanos: c_ulonglong,
+    cpu_system_use: c_ulonglong,
+    /* BlkIO usage */
+    blkio_read: c_ulonglong,
+    blkio_write: c_ulonglong,
+    /* Memory usage */
+    mem_used: c_ulonglong,
+    mem_limit: c_ulonglong,
+    rss_bytes: c_ulonglong,
+    page_faults: c_ulonglong,
+    major_page_faults: c_ulonglong,
+    /* Kernel Memory usage */
+    kmem_used: c_ulonglong,
+    kmem_limit: c_ulonglong,
+    /* Cache usage */
+    cache: c_ulonglong,
+    cache_total: c_ulonglong,
+    inactive_file_total: c_ulonglong,
+    /* Swap usage*/
+    swap_used: c_ulonglong,
+    swap_limit: c_ulonglong,
+}
+
+impl Stats {
+    fn copy(&mut self, in_obj: Metrics) {
+        self.pids_current = in_obj.pids.current;
+        self.cpu_use_nanos = in_obj.cpu.usage.total;
+        self.cpu_system_use = in_obj.cpu.usage.kernel;
+        self.mem_used = in_obj.memory.usage.usage;
+        self.mem_limit = in_obj.memory.usage.limit;
+        self.rss_bytes = in_obj.memory.rss;
+        self.page_faults = in_obj.memory.pg_fault;
+        self.major_page_faults = in_obj.memory.pg_maj_fault;
+        self.kmem_used = in_obj.memory.kernel.usage;
+        self.kmem_limit = in_obj.memory.kernel.limit;
+        self.inactive_file_total = in_obj.memory.total_inactive_file;
+        self.swap_limit = in_obj.memory.swap.limit;
+        self.swap_used = in_obj.memory.swap.usage;
+        for ele in in_obj.blkio.io_service_bytes_recursive.iter() {
+            if ele.op == "read" {
+                self.blkio_read += ele.value;
+            } else {
+                self.blkio_write += ele.value;
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn shim_v2_stats(container_id: *const c_char, stats: &mut Stats) -> c_int {
+    let r_container_id = to_string(container_id);
+    println!("lib-shim-v2::stats::{}::", r_container_id);
+    get_conn(&r_container_id)
+        .and_then(|client| {
+            client.stats().map(|metrics| {
+                println!("lib-shim-v2::metrics data::{:?}", metrics);
+                stats.copy(metrics);
+                0
+            })
+        })
+        .unwrap_or_else(|e| {
+            println!("lib-shim-v2::stats::{}:: failed, {}.", r_container_id, e);
             -1
         })
 }
