@@ -11,7 +11,11 @@
 // See the Mulan PSL v2 for more details.
 
 use super::error::{Error, Result};
+use crate::protocols::metrics::Metrics;
 use crate::protocols;
+use protobuf::{
+    CodedInputStream,Message,
+};
 use lazy_static::lazy_static;
 use nix::sys::socket::*;
 use protocols::task::Status as shim_v2_status;
@@ -406,6 +410,24 @@ impl Store {
             terminal: resp.terminal,
             exit_status: resp.exit_status,
         })
+    }
+
+    pub fn stats(&self) -> Result<Metrics> {
+        let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
+
+        let mut req = protocols::shim::StatsRequest::new();
+        req.id= self.container_id.clone();
+        let ctx = context::with_timeout(0);
+
+        let resp = client
+            .stats(ctx, &req)
+            .map_err(shim_error!(e, "ttrpc call stats failed"))?;
+        let mut m = Metrics::new();
+        if let Some(any) = resp.stats.as_ref() {
+            let mut input = CodedInputStream::from_bytes(any.value.as_ref());
+            m.merge_from(&mut input).unwrap();
+        }
+        Ok(m)
     }
 
     pub fn pids(&self) -> Result<i32> {

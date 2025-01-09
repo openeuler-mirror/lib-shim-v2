@@ -41,6 +41,32 @@ struct State {
     unsigned int exit_status;
 };
 
+struct Stats {
+    uint64_t pids_current;
+    /* CPU usage */
+    uint64_t cpu_use_nanos;
+    uint64_t cpu_system_use;
+    /* BlkIO usage */
+    uint64_t blkio_read;
+    uint64_t blkio_write;
+    /* Memory usage */
+    uint64_t mem_used;
+    uint64_t mem_limit;
+    uint64_t rss_bytes;
+    uint64_t page_faults;
+    uint64_t major_page_faults;
+    /* Kernel Memory usage */
+    uint64_t kmem_used;
+    uint64_t kmem_limit;
+    /* Cache usage */
+    uint64_t cache;
+    uint64_t cache_total;
+    uint64_t inactive_file_total;
+    /* Swap usage*/
+    uint64_t swap_used;
+    uint64_t swap_limit;
+};
+
 int shim_v2_new(const char *container_id, const char *addr);
 int shim_v2_close(const char *container_id);
 
@@ -59,6 +85,7 @@ int shim_v2_pause(const char *container_id);
 int shim_v2_resume(const char *container_id);
 
 int shim_v2_state(const char *container_id, const struct State *state);
+int shim_v2_stats(const char *container_id, const struct Stats *stats);
 int shim_v2_pids(const char *container_id, int *pid);
 
 int shim_v2_wait(const char *container_id, const char *exec_id, int *exit_status);
