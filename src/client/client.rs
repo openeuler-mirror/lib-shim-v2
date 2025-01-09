@@ -20,13 +20,13 @@ use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::path::MAIN_SEPARATOR;
 use std::sync::Mutex;
-use ttrpc::client::Client;
+use ttrpc::Client;
+use ttrpc::context;
 
 #[derive(Clone)]
 pub struct Store {
     conn: Client,
     container_id: String,
-    timeout: i64,
 }
 
 #[derive(Debug)]
@@ -135,12 +135,12 @@ pub fn new_conn(container_id: &String, addr: &String) -> Result<()> {
         connect_to_unix_socket(!addr.starts_with("unix://"), &path.to_string_lossy())?
     };
 
+    let client = ttrpc::Client::new(fd).map_err(|e| Error::Other(format!("failed to create ttrpc client: {:?}", e)))?;
     TTRPC_CLIENTS.lock().unwrap().insert(
         container_id.clone(),
         Store {
-            conn: Client::new(fd),
+            conn: client,
             container_id: container_id.clone(),
-            timeout: 0,
         },
     );
 
@@ -190,15 +190,17 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::CreateTaskRequest::new();
-        req.set_id(self.container_id.clone());
-        req.set_bundle(bundle.clone());
-        req.set_terminal(terminal);
-        req.set_stdin(stdin.clone());
-        req.set_stdout(stdout.clone());
-        req.set_stderr(stderr.clone());
+        req.id = self.container_id.clone();
+        req.bundle = bundle.clone();
+        req.terminal = terminal;
+        req.stdin = stdin.clone();
+        req.stdout = stdout.clone();
+        req.stderr = stderr.clone();
+
+        let ctx = context::with_timeout(0);
 
         let resp = client
-            .create(&req, self.timeout)
+            .create(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call create failed"))?;
 
         Ok(resp.pid as i32)
@@ -209,11 +211,13 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::StartRequest::new();
-        req.set_id(self.container_id.clone());
-        req.set_exec_id(exec_id.clone());
+        req.id = self.container_id.clone();
+        req.exec_id = exec_id.clone();
+
+        let ctx = context::with_timeout(0);
 
         let resp = client
-            .start(&req, self.timeout)
+            .start(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call start failed"))?;
 
         Ok(resp.pid as i32)
@@ -229,12 +233,14 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::KillRequest::new();
-        req.set_id(self.container_id.clone());
-        req.set_signal(signal);
-        req.set_all(all);
+        req.id = self.container_id.clone();
+        req.signal = signal;
+        req.all = all;
+
+        let ctx = context::with_timeout(0);
 
         client
-            .kill(&req, self.timeout)
+            .kill(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call kill failed"))?;
 
         Ok(())
@@ -245,11 +251,13 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::DeleteRequest::new();
-        req.set_id(self.container_id.clone());
-        req.set_exec_id(exec_id.clone());
+        req.id = self.container_id.clone();
+        req.exec_id = exec_id.clone();
+
+        let ctx = context::with_timeout(0);
 
         let resp = client
-            .delete(&req, self.timeout)
+            .delete(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call delete failed"))?;
 
         Ok(DeleteResponse {
@@ -263,10 +271,12 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::ShutdownRequest::new();
-        req.set_id(self.container_id.clone());
+        req.id = self.container_id.clone();
+
+        let ctx = context::with_timeout(0);
 
         client
-            .shutdown(&req, self.timeout)
+            .shutdown(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call shutdown failed"))?;
 
         Ok(())
@@ -287,22 +297,24 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::ExecProcessRequest::new();
-        req.set_id(self.container_id.clone());
-        req.set_exec_id(exec_id.clone());
-        req.set_terminal(terminal);
-        req.set_stdin(stdin.clone());
-        req.set_stdout(stdout.clone());
-        req.set_stderr(stderr.clone());
-        let mut exec_spec: ::protobuf::well_known_types::Any =
-            ::protobuf::well_known_types::Any::new();
-        exec_spec.set_value(std::vec::Vec::from(spec));
-        exec_spec.set_type_url(String::from(
+        req.id = self.container_id.clone();
+        req.exec_id = exec_id.clone();
+        req.terminal = terminal;
+        req.stdin = stdin.clone();
+        req.stdout = stdout.clone();
+        req.stderr = stderr.clone();
+        let mut exec_spec: ::protobuf::well_known_types::any::Any =
+            ::protobuf::well_known_types::any::Any::new();
+        exec_spec.value = std::vec::Vec::from(spec);
+        exec_spec.type_url = String::from(
             "types.containerd.io/opencontainers/runtime-spec/1/Process",
-        ));
-        req.set_spec(exec_spec);
+        );
+        req.spec = protobuf::MessageField::some(exec_spec);
+
+        let ctx = context::with_timeout(0);
 
         client
-            .exec(&req, self.timeout)
+            .exec(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call exec failed"))?;
 
         Ok(())
@@ -318,13 +330,15 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::ResizePtyRequest::new();
-        req.set_id(self.container_id.clone());
-        req.set_exec_id(exec_id.clone());
-        req.set_height(height);
-        req.set_width(width);
+        req.id = self.container_id.clone();
+        req.exec_id = exec_id.clone();
+        req.height = height;
+        req.width = width;
+
+        let ctx = context::with_timeout(0);
 
         client
-            .resize_pty(&req, self.timeout)
+            .resize_pty(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call resize_pty failed"))?;
 
         Ok(())
@@ -335,10 +349,12 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::PauseRequest::new();
-        req.set_id(self.container_id.clone());
+        req.id = self.container_id.clone();
+
+        let ctx = context::with_timeout(0);
 
         client
-            .pause(&req, self.timeout)
+            .pause(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call pause failed"))?;
 
         Ok(())
@@ -349,10 +365,12 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::ResumeRequest::new();
-        req.set_id(self.container_id.clone());
+        req.id = self.container_id.clone();
+
+        let ctx = context::with_timeout(0);
 
         client
-            .resume(&req, self.timeout)
+            .resume(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call resume failed"))?;
 
         Ok(())
@@ -363,16 +381,18 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::StateRequest::new();
-        req.set_id(self.container_id.clone());
+        req.id = self.container_id.clone();
+
+        let ctx = context::with_timeout(0);
 
         let resp = client
-            .state(&req, self.timeout)
+            .state(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call state failed"))?;
 
         Ok(State {
             id: self.container_id.clone(),
             pid: resp.pid,
-            status: match resp.status {
+            status: match resp.status.enum_value_or_default() {
                 shim_v2_status::CREATED => Status::CreatedStatus,
                 shim_v2_status::RUNNING => Status::RunningStatus,
                 shim_v2_status::STOPPED => Status::StoppedStatus,
@@ -394,12 +414,13 @@ impl Store {
         let mut req = protocols::shim::PidsRequest::new();
         req.id = self.container_id.clone();
 
-        let resp = c
-            .pids(&req, self.timeout)
-            .map_err(shim_error!(e, "call pids failed"))?;
-        let process = &resp.get_processes()[0];
+        let ctx = context::with_timeout(0);
 
-        Ok(process.pid as i32)
+        let resp = c
+            .pids(ctx, &req)
+            .map_err(shim_error!(e, "call pids failed"))?;
+        
+        Ok(resp.processes[0].pid as i32)
     }
 
     pub fn wait(&self, exec_id: &String) -> Result<i32> {
@@ -407,11 +428,13 @@ impl Store {
         let client = protocols::shim_ttrpc::TaskClient::new(self.conn.clone());
 
         let mut req = protocols::shim::WaitRequest::new();
-        req.set_id(self.container_id.clone());
-        req.set_exec_id(exec_id.clone());
+        req.id = self.container_id.clone();
+        req.exec_id = exec_id.clone();
+
+        let ctx = context::with_timeout(0);
 
         let resp = client
-            .wait(&req, self.timeout)
+            .wait(ctx, &req)
             .map_err(shim_error!(e, "ttrpc call wait failed"))?;
 
         Ok(resp.exit_status as i32)
